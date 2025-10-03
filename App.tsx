@@ -1,16 +1,17 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import ProjectEditor from './components/ProjectEditor';
 import AgentHub from './components/AgentHub';
-import { useProjectManager } from './hooks/useProjectManager';
+import { useConvexProjectManager } from './hooks/useConvexProjectManager';
 import { Project, DocumentCategory } from './types';
 import { Language, translations } from './lib/translations';
 import { MenuIcon } from './components/icons';
+import { LoginForm, RegisterForm, UserProfile } from './components/AuthForms';
+import { useAuth } from './contexts/AuthContext';
 
 const LANGUAGE_STORAGE_KEY = 'docugenius_language';
 
-type View = 'editor' | 'agentHub';
+type View = 'editor' | 'agentHub' | 'login' | 'register' | 'profile';
 
 // --- START: DESIGN PREVIEW ---
 // Dati fittizi per l'anteprima del design. Facilmente rimovibile.
@@ -50,11 +51,13 @@ const createPreviewProject = (language: Language): Project => {
 
 
 const App: React.FC = () => {
-  const { projects, loading, addProject, updateProject, deleteProject, getProject } = useProjectManager();
+  const { user, isLoading: authLoading, login, register, logout, updateUser } = useAuth();
+  const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, getProject, addDocumentsToProject } = useConvexProjectManager(user?.id || null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('editor');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   
   // --- START: DESIGN PREVIEW ---
   // Stato per gestire la modalità di anteprima del design.
@@ -62,17 +65,20 @@ const App: React.FC = () => {
   // --- END: DESIGN PREVIEW ---
 
   const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language) || 'it';
+    return user?.language || (localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language) || 'it';
   });
   
   const t = translations[language];
 
   useEffect(() => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-  }, [language]);
+    if (user && user.language !== language) {
+      updateUser({ language });
+    }
+  }, [language, user, updateUser]);
 
   useEffect(() => {
-    if (loading) {
+    if (authLoading || projectsLoading) {
       return;
     }
     
@@ -90,7 +96,7 @@ const App: React.FC = () => {
         setActiveProjectId(null);
       }
     }
-  }, [projects, activeProjectId, loading, previewProject]);
+  }, [projects, activeProjectId, authLoading, projectsLoading, previewProject]);
 
   const handleSelectProject = (id: string) => {
     // --- START: DESIGN PREVIEW ---
@@ -140,7 +146,95 @@ const App: React.FC = () => {
 
   const activeProject = getProject(activeProjectId);
 
+  const handleAuthSuccess = (userData: any) => {
+    setShowLogin(false);
+    // L'utente verrà gestito dal context
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    const success = await login(email, password);
+    if (success) {
+      setShowLogin(false);
+    }
+    return success;
+  };
+
+  const handleRegister = async (email: string, password: string, name?: string) => {
+    const success = await register(email, password, name);
+    if (success) {
+      setShowLogin(false);
+    }
+    return success;
+  };
+
+  const handleLogout = () => {
+    logout();
+    setActiveProjectId(null);
+    setCurrentView('editor');
+  };
+
   const renderContent = () => {
+    // Se non è autenticato, mostra login/register
+    if (!user) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-bold text-light mb-2">{t.welcome}</h1>
+              <p className="text-dark-text">Accedi al tuo account per gestire i tuoi progetti</p>
+            </div>
+            <div className="bg-secondary rounded-lg p-1 mb-4">
+              <div className="flex">
+                <button
+                  onClick={() => setShowLogin(false)}
+                  className={`flex-1 py-2 px-4 rounded-l-md font-semibold transition-colors ${
+                    !showLogin ? 'bg-accent text-primary' : 'bg-primary text-dark-text hover:bg-primary/80'
+                  }`}
+                >
+                  {t.registerTitle}
+                </button>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className={`flex-1 py-2 px-4 rounded-r-md font-semibold transition-colors ${
+                    showLogin ? 'bg-accent text-primary' : 'bg-primary text-dark-text hover:bg-primary/80'
+                  }`}
+                >
+                  {t.loginTitle}
+                </button>
+              </div>
+            </div>
+              {showLogin ? (
+                <LoginForm 
+                  language={language} 
+                  onAuthSuccess={handleAuthSuccess}
+                  onLogin={handleLogin}
+                />
+              ) : (
+                <RegisterForm 
+                  language={language} 
+                  onAuthSuccess={handleAuthSuccess}
+                  onRegister={handleRegister}
+                />
+              )}
+          </div>
+        </div>
+      );
+    }
+
+    // Se è autenticato, mostra il contenuto principale
+    if (currentView === 'profile') {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <UserProfile
+            user={user}
+            language={language}
+            onLogout={handleLogout}
+            onUpdateUser={updateUser}
+          />
+        </div>
+      );
+    }
+
     // --- START: DESIGN PREVIEW ---
     // Se la modalità anteprima è attiva, renderizza l'editor con il progetto fittizio.
     if (previewProject) {
@@ -158,7 +252,7 @@ const App: React.FC = () => {
       return <AgentHub language={language} />;
     }
 
-    if (loading) {
+    if (projectsLoading) {
       return (
         <div className="flex-1 flex items-center justify-center">
           <p>{t.loadingProjects}</p>
@@ -171,6 +265,7 @@ const App: React.FC = () => {
         <ProjectEditor 
           project={activeProject} 
           onUpdateProject={updateProject}
+          onSaveDocuments={addDocumentsToProject}
           language={language} 
         />
       );
@@ -203,29 +298,45 @@ const App: React.FC = () => {
     );
   };
 
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="flex h-screen font-sans bg-primary flex items-center justify-center">
+        <div className="text-light text-xl">{t.loadingProjects}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen font-sans bg-primary">
-      <Sidebar
-        projects={projects}
-        activeProjectId={activeProjectId}
-        language={language}
-        currentView={currentView}
-        isCollapsed={isSidebarCollapsed}
-        isMobileOpen={isMobileSidebarOpen}
-        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
-        onSetMobileOpen={setIsMobileSidebarOpen}
-        onSelectProject={handleSelectProject}
-        onNewProject={handleNewProject}
-        onDeleteProject={handleDeleteProject}
-        onLanguageChange={setLanguage}
-        onSetView={handleSetView}
-      />
+      {user && (
+        <Sidebar
+          projects={projects}
+          activeProjectId={activeProjectId}
+          language={language}
+          currentView={currentView}
+          isCollapsed={isSidebarCollapsed}
+          isMobileOpen={isMobileSidebarOpen}
+          onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+          onSetMobileOpen={setIsMobileSidebarOpen}
+          onSelectProject={handleSelectProject}
+          onNewProject={handleNewProject}
+          onDeleteProject={handleDeleteProject}
+          onLanguageChange={setLanguage}
+          onSetView={handleSetView}
+          user={user}
+          onProfileClick={() => setCurrentView('profile')}
+          onLogout={handleLogout}
+        />
+      )}
       <main className="flex-1 text-light flex flex-col transition-all duration-300">
-        <div className="lg:hidden p-2 absolute top-2 left-2 z-20">
-            <button onClick={() => setIsMobileSidebarOpen(true)} className="p-2 rounded-md bg-secondary/80 text-light">
-                <MenuIcon className="h-6 w-6"/>
-            </button>
-        </div>
+        {user && (
+          <div className="lg:hidden p-2 absolute top-2 left-2 z-20">
+              <button onClick={() => setIsMobileSidebarOpen(true)} className="p-2 rounded-md bg-secondary/80 text-light">
+                  <MenuIcon className="h-6 w-6"/>
+              </button>
+          </div>
+        )}
         {renderContent()}
       </main>
     </div>

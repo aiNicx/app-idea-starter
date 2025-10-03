@@ -5,8 +5,10 @@ import { ideaEnhancerPrompt, frontendDocPrompt, cssSpecPrompt, backendDocPrompt,
 // Configurazione modelli OpenRouter - puoi aggiungere/rimuovere modelli qui
 export const OPENROUTER_MODELS = {
   // Modelli gratuiti e popolari
-  'x-ai/grok-4-fast:free': 'Grok-4 Fast (Free)',
-  'meta-llama/llama-3.1-8b-instruct': 'Llama 3.1 8B (Free)',
+  'meta-llama/llama-3.3-70b-instruct:free': 'Llama 3.3 70B (Free)',
+  'meta-llama/llama-3.1-8b-instruct:free': 'Llama 3.1 8B (Free)',
+  'microsoft/phi-3-mini-128k-instruct:free': 'Phi-3 Mini (Free)',
+  'google/gemini-2.0-flash-exp:free': 'Gemini 2.0 Flash (Free)',
 
   // Modelli a pagamento (più potenti)
   'google/gemini-2.5-flash-lite-preview-09-2025': 'Gemini Flash 2.5 Lite',
@@ -17,7 +19,7 @@ export const OPENROUTER_MODELS = {
 export type OpenRouterModelId = keyof typeof OPENROUTER_MODELS;
 
 // Configurazione di default
-const DEFAULT_MODEL: OpenRouterModelId = 'x-ai/grok-4-fast:free';
+const DEFAULT_MODEL: OpenRouterModelId = 'meta-llama/llama-3.3-70b-instruct:free';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
 
 // Tipi per le risposte di OpenRouter
@@ -42,51 +44,70 @@ const getLanguageInstruction = (language: Language) => {
     : "IMPORTANT: Your entire response must be in English.";
 };
 
-// Funzione principale per chiamare OpenRouter
-async function callOpenRouter(prompt: string, modelId: OpenRouterModelId = DEFAULT_MODEL): Promise<string> {
+// Funzione principale per chiamare OpenRouter con retry logic
+async function callOpenRouter(prompt: string, modelId: OpenRouterModelId = DEFAULT_MODEL, retries: number = 3): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     throw new Error('OpenRouter API key not found. Please set OPENROUTER_API_KEY in your .env.local file.');
   }
 
-  try {
-    const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'DocuGenius AI'
-      },
-      body: JSON.stringify({
-        model: modelId,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 4000,
-        temperature: 0.7
-      })
-    });
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'DocuGenius AI'
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 4000,
+          temperature: 0.7
+        })
+      });
 
-    if (!response.ok) {
-      const errorData: OpenRouterError = await response.json();
-      throw new Error(`OpenRouter API error: ${errorData.error.message}`);
+      if (!response.ok) {
+        // Se è un errore 429 (rate limit), aspetta e riprova
+        if (response.status === 429 && attempt < retries - 1) {
+          const waitTime = Math.pow(2, attempt) * 3000; // Exponential backoff: 3s, 6s, 12s
+          console.log(`Rate limit hit, waiting ${waitTime / 1000}s before retry ${attempt + 1}/${retries}...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        const errorData: OpenRouterError = await response.json();
+        throw new Error(`OpenRouter API error: ${errorData.error.message}`);
+      }
+
+      const data: OpenRouterResponse = await response.json();
+      return data.choices[0].message.content;
+
+    } catch (error) {
+      // Se è l'ultimo tentativo, lancia l'errore
+      if (attempt === retries - 1) {
+        console.error('Error calling OpenRouter API:', error);
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Failed to generate content. Please check your API key and connection.');
+      }
+      // Altrimenti aspetta e riprova
+      const waitTime = Math.pow(2, attempt) * 2000;
+      console.log(`Error occurred, waiting ${waitTime / 1000}s before retry ${attempt + 1}/${retries}...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-
-    const data: OpenRouterResponse = await response.json();
-    return data.choices[0].message.content;
-
-  } catch (error) {
-    console.error('Error calling OpenRouter API:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to generate content. Please check your API key and connection.');
   }
+  
+  throw new Error('Max retries reached');
 }
 
 // --- Agent Functions (adattati per OpenRouter) ---
@@ -114,30 +135,44 @@ export const documentationGeneratorAgent = async (idea: string, language: Langua
   try {
     console.log("Starting documentation generation...");
 
+    // Helper function to add delay between requests
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     // 1. Generate Frontend Document first
     const frontendDoc = await generateFrontendDoc(idea, language, modelId);
     documents.push(frontendDoc);
     console.log("Frontend Doc generated.");
 
-    // 2. Generate CSS and Backend in parallel
-    const cssPromise = generateCssSpec(idea, language, frontendDoc.content, modelId);
-    const backendPromise = generateBackendDoc(idea, language, frontendDoc.content, modelId);
+    // Wait 2 seconds to avoid rate limiting
+    await delay(2000);
 
-    const [cssResult, backendResult] = await Promise.allSettled([cssPromise, backendPromise]);
-
-    if (cssResult.status === 'fulfilled') {
-      documents.push(cssResult.value);
+    // 2. Generate CSS Spec
+    try {
+      const cssDoc = await generateCssSpec(idea, language, frontendDoc.content, modelId);
+      documents.push(cssDoc);
       console.log("CSS Spec generated.");
-    } else {
-      console.error("CSS Spec generation failed:", cssResult.reason);
+    } catch (e) {
+      console.error("CSS Spec generation failed:", e);
     }
 
-    if (backendResult.status === 'fulfilled') {
-      const backendDoc = backendResult.value;
+    // Wait 2 seconds to avoid rate limiting
+    await delay(2000);
+
+    // 3. Generate Backend Doc
+    let backendDoc;
+    try {
+      backendDoc = await generateBackendDoc(idea, language, frontendDoc.content, modelId);
       documents.push(backendDoc);
       console.log("Backend Doc generated.");
+    } catch (e) {
+      console.error("Backend Doc generation failed:", e);
+    }
 
-      // 3. Generate DB Schema
+    // Wait 2 seconds to avoid rate limiting
+    await delay(2000);
+
+    // 4. Generate DB Schema (only if backend was generated)
+    if (backendDoc) {
       try {
         const dbSchemaDoc = await generateDbSchema(idea, language, frontendDoc.content, backendDoc.content, modelId);
         documents.push(dbSchemaDoc);
@@ -145,9 +180,6 @@ export const documentationGeneratorAgent = async (idea: string, language: Langua
       } catch (e) {
         console.error("DB Schema generation failed:", e);
       }
-
-    } else {
-       console.error("Backend Doc generation failed:", backendResult.reason);
     }
 
     // Reorder documents

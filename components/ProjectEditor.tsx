@@ -10,6 +10,7 @@ import { Language, translations } from '../lib/translations';
 interface ProjectEditorProps {
   project: Project;
   onUpdateProject: (project: Project) => void;
+  onSaveDocuments?: (projectId: string, documents: Document[]) => Promise<void>;
   language: Language;
 }
 
@@ -86,7 +87,7 @@ const DocumentModal: React.FC<{document: Document, onClose: () => void}> = ({ do
 };
 
 
-const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject, language }) => {
+const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject, onSaveDocuments, language }) => {
   const [currentProject, setCurrentProject] = useState<Project>(project);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -108,10 +109,22 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
     setCurrentProject({ ...currentProject, name: e.target.value });
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     setIsSaving(true);
-    onUpdateProject(currentProject);
-    setTimeout(() => setIsSaving(false), 1500);
+    try {
+      // Salva il progetto
+      onUpdateProject(currentProject);
+      
+      // Salva i documenti se ci sono e se la funzione è fornita
+      if (onSaveDocuments && currentProject.documents && currentProject.documents.length > 0) {
+        await onSaveDocuments(currentProject.id, currentProject.documents);
+      }
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Errore durante il salvataggio. Riprova.');
+    } finally {
+      setTimeout(() => setIsSaving(false), 1500);
+    }
   };
 
   const handleMatureIdea = async () => {
