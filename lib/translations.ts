@@ -1,0 +1,95 @@
+
+export const translations = {
+  it: {
+    // sidebar
+    slogan: 'Il tuo assistente per la documentazione',
+    newProject: 'Nuovo Progetto',
+    deleteConfirmation: 'Sei sicuro di voler eliminare questo progetto?',
+    aiCredit: 'Creato con Intelligenza Artificiale',
+    meetTheAgents: 'Incontra gli Agenti',
+    toggleSidebar: 'Minimizza Sidebar',
+    // editor
+    projectNamePlaceholder: 'Nome del progetto',
+    saveChanges: 'Salva Modifiche',
+    saved: 'Salvato!',
+    ideaLabel: 'La tua Idea Iniziale',
+    ideaPlaceholder: "Descrivi la tua idea per un'app, anche in modo generico...",
+    maturingIdea: 'Miglioro la tua idea...',
+    generatingDocs: 'Genero i documenti... Potrebbe richiedere un momento.',
+    matureIdeaBtn: 'Maturare Idea',
+    produceDocsBtn: 'Produrre Documenti',
+    generatedDocsTitle: 'Documenti Generati',
+    // empty state
+    welcome: 'Benvenuto in DocuGenius AI',
+    welcomeMsg: 'Seleziona un progetto dalla barra laterale o creane uno nuovo per iniziare a trasformare le tue idee in documentazione di sviluppo completa.',
+    createFirstProject: 'Crea il tuo primo progetto',
+    designPreview: 'Mostra Anteprima Design',
+    designPreviewProjectName: 'Progetto di Anteprima',
+    // loading
+    loadingProjects: 'Caricamento progetti...',
+    // Agent Hub
+    agentHubTitle: 'Incontra gli Agenti AI',
+    agentHubDescription: 'DocuGenius utilizza un team di agenti AI specializzati che lavorano insieme per trasformare la tua idea in documentazione completa. Scopri chi sono e cosa fanno.',
+    workflowTitle: 'Flusso di Lavoro degli Agenti',
+    agentProfilesTitle: 'Profili degli Agenti',
+    userIdea: 'Idea Utente',
+    maturedIdea: 'Idea Maturata',
+    generatedDocs: 'Documenti Generati',
+    copyPrompt: 'Copia Prompt',
+    promptCopied: 'Copiato!',
+    // Agent Personas
+    productManager: 'Il Product Manager',
+    orchestrator: "L'Orchestratore",
+    frontendDev: 'Lo Sviluppatore Frontend',
+    uiUxDesigner: 'Il UI/UX Designer',
+    backendArchitect: "L'Architetto Backend",
+    dbAdmin: 'Il Database Admin',
+  },
+  en: {
+    // sidebar
+    slogan: 'Your documentation assistant',
+    newProject: 'New Project',
+    deleteConfirmation: 'Are you sure you want to delete this project?',
+    aiCredit: 'Created with Artificial Intelligence',
+    meetTheAgents: 'Meet the Agents',
+    toggleSidebar: 'Toggle Sidebar',
+    // editor
+    projectNamePlaceholder: 'Project Name',
+    saveChanges: 'Save Changes',
+    saved: 'Saved!',
+    ideaLabel: 'Your Initial Idea',
+    ideaPlaceholder: 'Describe your app idea, even a general one...',
+    maturingIdea: 'Enhancing your idea...',
+    generatingDocs: 'Generating documents... This may take a moment.',
+    matureIdeaBtn: 'Mature Idea',
+    produceDocsBtn: 'Produce Documents',
+    generatedDocsTitle: 'Generated Documents',
+    // empty state
+    welcome: 'Welcome to DocuGenius AI',
+    welcomeMsg: 'Select a project from the sidebar or create a new one to start turning your ideas into complete development documentation.',
+    createFirstProject: 'Create your first project',
+    designPreview: 'Show Design Preview',
+    designPreviewProjectName: 'Design Preview Project',
+    // loading
+    loadingProjects: 'Loading projects...',
+    // Agent Hub
+    agentHubTitle: 'Meet the AI Agents',
+    agentHubDescription: 'DocuGenius uses a team of specialized AI agents working together to transform your idea into comprehensive documentation. Discover who they are and what they do.',
+    workflowTitle: 'Agent Workflow',
+    agentProfilesTitle: 'Agent Profiles',
+    userIdea: 'User Idea',
+    maturedIdea: 'Matured Idea',
+    generatedDocs: 'Generated Docs',
+    copyPrompt: 'Copy Prompt',
+    promptCopied: 'Copied!',
+    // Agent Personas
+    productManager: 'The Product Manager',
+    orchestrator: 'The Orchestrator',
+    frontendDev: 'The Frontend Developer',
+    uiUxDesigner: 'The UI/UX Designer',
+    backendArchitect: 'The Backend Architect',
+    dbAdmin: 'The Database Admin',
+  }
+};
+
+export type Language = keyof typeof translations;
