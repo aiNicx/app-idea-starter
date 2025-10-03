@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Document } from '../types';
-import { ideaEnhancerAgent, documentationGeneratorAgent } from '../services/geminiService';
+import { ideaEnhancerAgent, documentationGeneratorAgent, OPENROUTER_MODELS, OpenRouterModelId } from '../services/openRouterService';
 import { WandIcon, DocumentTextIcon, SaveIcon, XMarkIcon, CopyIcon, DownloadIcon, CheckIcon } from './icons';
 import Spinner from './Spinner';
 import DocumentCard from './DocumentCard';
@@ -92,6 +92,7 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDocForModal, setSelectedDocForModal] = useState<Document | null>(null);
+  const [selectedModel, setSelectedModel] = useState<OpenRouterModelId>('x-ai/grok-4-fast:free');
 
   const t = translations[language];
 
@@ -118,7 +119,7 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
     setIsLoading(true);
     setLoadingMessage(t.maturingIdea);
     try {
-      const enhancedIdea = await ideaEnhancerAgent(currentProject.idea, language);
+      const enhancedIdea = await ideaEnhancerAgent(currentProject.idea, language, selectedModel);
       setCurrentProject({ ...currentProject, idea: enhancedIdea });
     } catch (error) {
       alert(error instanceof Error ? error.message : "An unknown error occurred.");
@@ -132,7 +133,7 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
     setIsLoading(true);
     setLoadingMessage(t.generatingDocs);
     try {
-      const newDocuments = await documentationGeneratorAgent(currentProject.idea, language);
+      const newDocuments = await documentationGeneratorAgent(currentProject.idea, language, selectedModel);
       setCurrentProject(prev => ({ ...prev, documents: newDocuments }));
     } catch (error) {
       alert(error instanceof Error ? error.message : "An unknown error occurred.");
@@ -152,13 +153,25 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
             className="w-full sm:w-auto text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-transparent focus:border-accent focus:outline-none text-light transition-colors"
             placeholder={t.projectNamePlaceholder}
           />
-          <button 
-            onClick={handleSaveChanges}
-            disabled={isSaving}
-            className={`flex-shrink-0 flex items-center px-4 py-2 rounded-lg font-semibold transition-colors w-full sm:w-auto justify-center ${isSaving ? 'bg-green-600 text-white' : 'bg-secondary hover:bg-accent hover:text-primary text-light'}`}
-          >
-            {isSaving ? t.saved : <><SaveIcon /> {t.saveChanges}</>}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value as OpenRouterModelId)}
+              className="px-3 py-2 bg-secondary text-light border border-primary rounded-lg focus:ring-2 focus:ring-accent focus:outline-none text-sm"
+              disabled={isLoading}
+            >
+              {Object.entries(OPENROUTER_MODELS).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSaveChanges}
+              disabled={isSaving}
+              className={`flex-shrink-0 flex items-center px-4 py-2 rounded-lg font-semibold transition-colors justify-center ${isSaving ? 'bg-green-600 text-white' : 'bg-secondary hover:bg-accent hover:text-primary text-light'}`}
+            >
+              {isSaving ? t.saved : <><SaveIcon /> {t.saveChanges}</>}
+            </button>
+          </div>
         </div>
 
         <div className="bg-secondary p-4 sm:p-6 rounded-lg shadow-xl">
