@@ -1,6 +1,35 @@
-import { action } from "./_generated/server";
+import { action, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { agentProfiles } from "../lib/agentPrompts";
+
+/**
+ * Crea un utente di sistema per gli agenti predefiniti
+ */
+export const createSystemUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Verifica se l'utente di sistema esiste già
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", "system@agents.app"))
+      .unique();
+
+    if (existingUser) {
+      return existingUser._id;
+    }
+
+    // Crea l'utente di sistema
+    const now = Date.now();
+    return await ctx.db.insert("users", {
+      email: "system@agents.app",
+      passwordHash: "system", // Password fittizia per utente di sistema
+      name: "System",
+      language: "en",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
 
 /**
  * Migra gli agenti predefiniti da agentPrompts.ts al database
@@ -9,6 +38,9 @@ export const migrateDefaultAgents = action({
   args: {},
   handler: async (ctx) => {
     console.log("Starting migration of default agents...");
+
+    // Crea o ottieni l'utente di sistema
+    const systemUserId = await ctx.runMutation("migrations:createSystemUser" as any);
 
     // Verifica se gli agenti di sistema sono già stati migrati
     const existingSystemAgents = await ctx.runQuery("agents:getSystemAgents" as any);
@@ -19,7 +51,6 @@ export const migrateDefaultAgents = action({
     }
 
     const now = Date.now();
-    const systemUserId = "system" as any; // ID speciale per agenti di sistema
 
     try {
       // Migra ogni agente predefinito
@@ -101,11 +132,7 @@ export const migrateDefaultAgents = action({
         ],
       });
 
-      // Aggiorna il workflow per impostarlo come sistema
-      await ctx.runMutation("workflows:updateWorkflow" as any, {
-        workflowId: defaultWorkflowId,
-        isSystem: true,
-      });
+      // Il workflow è già creato correttamente
 
       console.log("Migration completed successfully!");
       return { 
@@ -130,13 +157,15 @@ export const createDefaultConfigurations = action({
   handler: async (ctx) => {
     console.log("Creating default configurations...");
 
+    // Crea o ottieni l'utente di sistema
+    const systemUserId = await ctx.runMutation("migrations:createSystemUser" as any);
+
     const systemAgents = await ctx.runQuery("agents:getSystemAgents" as any);
     
     if (systemAgents.length === 0) {
       throw new Error("No system agents found. Run migrateDefaultAgents first.");
     }
 
-    const systemUserId = "system" as any;
     const now = Date.now();
 
     try {
@@ -206,12 +235,15 @@ export const checkMigrationStatus = action({
   args: {},
   handler: async (ctx) => {
     try {
+      // Crea o ottieni l'utente di sistema
+      const systemUserId = await ctx.runMutation("migrations:createSystemUser" as any);
+
       const systemAgents = await ctx.runQuery("agents:getSystemAgents" as any);
       const systemConfigurations = await ctx.runQuery("agentConfigurations:getConfigurationsByUser" as any, {
-        userId: "system" as any,
+        userId: systemUserId,
       });
       const systemWorkflows = await ctx.runQuery("workflows:getWorkflowsByUser" as any, {
-        userId: "system" as any,
+        userId: systemUserId,
       });
 
       return {
@@ -249,12 +281,15 @@ export const rollbackMigration = action({
     console.log("Rolling back migration...");
 
     try {
+      // Crea o ottieni l'utente di sistema
+      const systemUserId = await ctx.runMutation("migrations:createSystemUser" as any);
+
       const systemAgents = await ctx.runQuery("agents:getSystemAgents" as any);
       const systemConfigurations = await ctx.runQuery("agentConfigurations:getConfigurationsByUser" as any, {
-        userId: "system" as any,
+        userId: systemUserId,
       });
       const systemWorkflows = await ctx.runQuery("workflows:getWorkflowsByUser" as any, {
-        userId: "system" as any,
+        userId: systemUserId,
       });
 
       // Rimuovi configurazioni

@@ -4,6 +4,16 @@ import { api } from '../convex/_generated/api';
 import { Id } from '../convex/_generated/dataModel';
 import { Agent, Workflow, AgentConfiguration, AgentExecutionContext, WorkflowExecutionContext } from '../types/agents';
 import { Document } from '../types';
+import { DynamicAgentService } from '../services/dynamicAgentService';
+
+/**
+ * Hook per inizializzare il DynamicAgentService
+ */
+export const useDynamicAgentService = (convexUrl: string) => {
+  useEffect(() => {
+    DynamicAgentService.initializeConvex(convexUrl);
+  }, [convexUrl]);
+};
 
 /**
  * Hook per gestire gli agenti di un utente
@@ -387,12 +397,7 @@ export const useAgentExecution = () => {
     });
 
     try {
-      // TODO: Implementare con il servizio dinamico
-      // const result = await DynamicAgentService.executeAgent(agent, context);
-      
-      // Simulazione temporanea
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const result = `Simulated result from ${agent.name}`;
+      const result = await DynamicAgentService.executeAgent(agent, context);
       
       setExecutionProgress(prev => ({
         ...prev,
@@ -423,30 +428,7 @@ export const useAgentExecution = () => {
     });
 
     try {
-      // TODO: Implementare con il servizio dinamico
-      // const result = await DynamicAgentService.executeWorkflow(workflow, context);
-      
-      // Simulazione temporanea
-      const activeSteps = workflow.agentSequence.filter(step => step.isActive);
-      const documents: Document[] = [];
-      
-      for (let i = 0; i < activeSteps.length; i++) {
-        const step = activeSteps[i];
-        setExecutionProgress(prev => ({
-          ...prev,
-          currentStep: i + 1,
-          currentAgent: `Agent ${step.agentId}`,
-        }));
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Simula creazione documento
-        documents.push({
-          id: `doc_${Date.now()}_${i}`,
-          category: 'FRONTEND' as any,
-          content: `Simulated content from step ${i + 1}`,
-        });
-      }
+      const documents = await DynamicAgentService.executeWorkflow(workflow, context);
       
       setExecutionProgress(prev => ({
         ...prev,

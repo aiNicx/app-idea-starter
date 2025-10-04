@@ -118,6 +118,7 @@ export const updateAgent = mutation({
     icon: v.optional(v.string()),
     promptTemplate: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
+    isSystem: v.optional(v.boolean()),
     order: v.optional(v.number()),
   },
   handler: async (ctx, { agentId, ...updates }) => {
@@ -126,8 +127,8 @@ export const updateAgent = mutation({
       throw new Error("Agent not found");
     }
 
-    // Non permettere modifiche agli agenti di sistema
-    if (existingAgent.isSystem) {
+    // Non permettere modifiche agli agenti di sistema, tranne per isSystem durante la migrazione
+    if (existingAgent.isSystem && !updates.hasOwnProperty('isSystem')) {
       throw new Error("Cannot modify system agents");
     }
 

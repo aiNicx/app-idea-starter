@@ -1,8 +1,9 @@
 // Tipi per il sistema modulare di agenti
+import { Id } from "../convex/_generated/dataModel";
 
 export interface Agent {
-  id: string;
-  userId: string;
+  id: Id<"agents">;
+  userId: Id<"users">;
   name: string;
   description: string;
   persona: string;
@@ -16,15 +17,15 @@ export interface Agent {
 }
 
 export interface WorkflowStep {
-  agentId: string;
+  agentId: Id<"agents">;
   order: number;
   isActive: boolean;
   conditions?: string; // JSON string per logica condizionale
 }
 
 export interface Workflow {
-  id: string;
-  userId: string;
+  id: Id<"workflows">;
+  userId: Id<"users">;
   name: string;
   description: string;
   agentSequence: WorkflowStep[];
@@ -34,9 +35,9 @@ export interface Workflow {
 }
 
 export interface AgentConfiguration {
-  id: string;
-  userId: string;
-  agentId: string;
+  id: Id<"agentConfigurations">;
+  userId: Id<"users">;
+  agentId: Id<"agents">;
   customPrompt?: string;
   modelId: string;
   temperature: number;
@@ -92,6 +93,7 @@ export interface AgentExecutionContext {
   idea: string;
   language: string;
   modelId?: string;
+  userId: Id<"users">;
   variables: Record<string, any>;
 }
 
@@ -124,7 +126,7 @@ export interface UpdateWorkflowInput extends Partial<CreateWorkflowInput> {
 }
 
 export interface CreateConfigurationInput {
-  agentId: string;
+  agentId: Id<"agents">;
   customPrompt?: string;
   modelId: string;
   temperature: number;

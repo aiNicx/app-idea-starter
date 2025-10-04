@@ -3,8 +3,30 @@ import { Language } from '../lib/translations';
 import { Agent, Workflow, AgentConfiguration, AgentExecutionContext, WorkflowExecutionContext } from '../types/agents';
 import { TemplateEngine } from '../lib/templateEngine';
 import { callOpenRouter } from './openRouterService';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '../convex/_generated/api';
+import { Id } from '../convex/_generated/dataModel';
 
 export class DynamicAgentService {
+  private static convexClient: ConvexHttpClient | null = null;
+
+  /**
+   * Inizializza il client Convex
+   */
+  static initializeConvex(convexUrl: string) {
+    this.convexClient = new ConvexHttpClient(convexUrl);
+  }
+
+  /**
+   * Ottiene il client Convex
+   */
+  private static getConvexClient(): ConvexHttpClient {
+    if (!this.convexClient) {
+      throw new Error('Convex client not initialized. Call initializeConvex() first.');
+    }
+    return this.convexClient;
+  }
+
   /**
    * Esegue un singolo agente con il contesto fornito
    */
@@ -13,6 +35,15 @@ export class DynamicAgentService {
     context: AgentExecutionContext
   ): Promise<string> {
     try {
+      // Ottieni la configurazione attiva per l'agente
+      const configuration = await this.getActiveConfigurationForAgent(agent.id, context.userId);
+      
+      // Usa la configurazione se disponibile, altrimenti usa i valori di default
+      const modelId = configuration?.modelId || context.modelId || 'google/gemini-2.0-flash-exp:free';
+      const temperature = configuration?.temperature || context.variables.temperature || 0.7;
+      const maxTokens = configuration?.maxTokens || context.variables.maxTokens || 4000;
+      const customPrompt = configuration?.customPrompt || agent.promptTemplate;
+
       // Prepara le variabili per il template
       const templateVariables = {
         idea: context.idea,
@@ -22,15 +53,15 @@ export class DynamicAgentService {
         userName: context.variables.userName || '',
         projectName: context.variables.projectName || '',
         language: context.language as "it" | "en",
-        modelId: context.modelId || 'google/gemini-2.0-flash-exp:free',
-        temperature: context.variables.temperature || 0.7,
-        maxTokens: context.variables.maxTokens || 4000,
+        modelId,
+        temperature,
+        maxTokens,
         ...context.variables,
       };
 
       // Renderizza il template con le variabili
       const renderedPrompt = TemplateEngine.renderTemplate(
-        agent.promptTemplate, 
+        customPrompt, 
         templateVariables
       );
 
@@ -46,7 +77,7 @@ export class DynamicAgentService {
       // Esegui la chiamata a OpenRouter
       const result = await callOpenRouter(
         renderedPrompt, 
-        (context.modelId as any) || 'google/gemini-2.0-flash-exp:free'
+        modelId as any
       );
 
       return result;
@@ -96,6 +127,7 @@ export class DynamicAgentService {
           // Prepara il contesto per l'agente
           const agentContext: AgentExecutionContext = {
             ...context,
+            userId: workflow.userId, // Usa l'userId del workflow
             variables: {
               ...context.variables,
               ...previousResults,
@@ -137,7 +169,7 @@ export class DynamicAgentService {
    * Valida una configurazione di agente
    */
   static async validateAgentConfiguration(
-    agentId: string, 
+    agentId: Id<"agents">, 
     config: AgentConfiguration
   ): Promise<boolean> {
     try {
@@ -185,13 +217,179 @@ export class DynamicAgentService {
   }
 
   /**
-   * Ottiene un agente per ID (placeholder - da implementare con Convex)
+   * Ottiene un agente per ID
    */
-  static async getAgentById(agentId: string): Promise<Agent | null> {
-    // TODO: Implementare con Convex query
-    // Per ora restituisce null, sarà implementato quando si integra con Convex
-    console.warn('getAgentById not implemented yet');
-    return null;
+  static async getAgentById(agentId: Id<"agents">): Promise<Agent | null> {
+    try {
+      const client = this.getConvexClient();
+      const agent = await client.query(api.agents.getAgentById, { agentId });
+      
+      if (!agent) {
+        return null;
+      }
+
+      // Converte il documento Convex in un oggetto Agent
+      return {
+        id: agent._id,
+        userId: agent.userId,
+        name: agent.name,
+        description: agent.description,
+        persona: agent.persona,
+        icon: agent.icon,
+        promptTemplate: agent.promptTemplate,
+        isActive: agent.isActive,
+        isSystem: agent.isSystem,
+        order: agent.order,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error fetching agent:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Ottiene un workflow per ID
+   */
+  static async getWorkflowById(workflowId: Id<"workflows">): Promise<Workflow | null> {
+    try {
+      const client = this.getConvexClient();
+      const workflow = await client.query(api.workflows.getWorkflowWithAgents, { workflowId });
+      
+      if (!workflow) {
+        return null;
+      }
+
+      // Converte il documento Convex in un oggetto Workflow
+      return {
+        id: workflow._id,
+        userId: workflow.userId,
+        name: workflow.name,
+        description: workflow.description,
+        agentSequence: workflow.agentSequence.map(step => ({
+          agentId: step.agentId,
+          order: step.order,
+          isActive: step.isActive,
+          conditions: step.conditions,
+        })),
+        isActive: workflow.isActive,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error fetching workflow:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Ottiene la configurazione attiva per un agente
+   */
+  static async getActiveConfigurationForAgent(agentId: Id<"agents">, userId: Id<"users">): Promise<AgentConfiguration | null> {
+    try {
+      const client = this.getConvexClient();
+      const config = await client.query(api.agentConfigurations.getActiveConfigurationForAgent, { 
+        agentId, 
+        userId 
+      });
+      
+      if (!config) {
+        return null;
+      }
+
+      // Converte il documento Convex in un oggetto AgentConfiguration
+      return {
+        id: config._id,
+        userId: config.userId,
+        agentId: config.agentId,
+        customPrompt: config.customPrompt,
+        modelId: config.modelId,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+        isActive: config.isActive,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error fetching configuration:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Ottiene tutti gli agenti di sistema
+   */
+  static async getSystemAgents(): Promise<Agent[]> {
+    try {
+      const client = this.getConvexClient();
+      const agents = await client.query(api.agents.getSystemAgents);
+      
+      return agents.map(agent => ({
+        id: agent._id,
+        userId: agent.userId,
+        name: agent.name,
+        description: agent.description,
+        persona: agent.persona,
+        icon: agent.icon,
+        promptTemplate: agent.promptTemplate,
+        isActive: agent.isActive,
+        isSystem: agent.isSystem,
+        order: agent.order,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+      }));
+    } catch (error) {
+      console.error('Error fetching system agents:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Ottiene il workflow predefinito (primo workflow di sistema)
+   */
+  static async getDefaultWorkflow(): Promise<Workflow | null> {
+    try {
+      const client = this.getConvexClient();
+      
+      // Ottieni prima gli agenti di sistema per ottenere l'userId di sistema
+      const systemAgents = await client.query(api.agents.getSystemAgents);
+      if (systemAgents.length === 0) {
+        return null;
+      }
+      
+      const systemUserId = systemAgents[0].userId;
+      
+      // Ottieni tutti i workflow di sistema
+      const systemWorkflows = await client.query(api.workflows.getWorkflowsByUser, {
+        userId: systemUserId
+      });
+      
+      if (systemWorkflows.length === 0) {
+        return null;
+      }
+
+      // Restituisci il primo workflow di sistema
+      const workflow = systemWorkflows[0];
+      return {
+        id: workflow._id,
+        userId: workflow.userId,
+        name: workflow.name,
+        description: workflow.description,
+        agentSequence: workflow.agentSequence.map(step => ({
+          agentId: step.agentId,
+          order: step.order,
+          isActive: step.isActive,
+          conditions: step.conditions,
+        })),
+        isActive: workflow.isActive,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error fetching default workflow:', error);
+      return null;
+    }
   }
 
   /**
@@ -348,6 +546,7 @@ export class WorkflowExecutor {
 
           const agentContext: AgentExecutionContext = {
             ...context,
+            userId: workflow.userId, // Usa l'userId del workflow
             variables: context.variables,
           };
 
