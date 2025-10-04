@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
-import { Project, Document } from '../types';
+import { Project, Document, DocumentCategory } from '../types';
 import { Id } from '../convex/_generated/dataModel';
 
 export const useConvexProjectManager = (userId: string | null) => {
@@ -22,7 +22,20 @@ export const useConvexProjectManager = (userId: string | null) => {
 
   useEffect(() => {
     if (projectsData) {
-      setProjects(projectsData);
+      // Mappa i dati da Convex al formato atteso
+      const mappedProjects = projectsData.map(project => ({
+        id: project.id,
+        name: project.name,
+        idea: project.idea,
+        documents: project.documents.map(doc => ({
+          id: doc.id,
+          category: doc.category as DocumentCategory,
+          content: doc.content
+        })),
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt
+      }));
+      setProjects(mappedProjects);
       setLoading(false);
     }
   }, [projectsData]);

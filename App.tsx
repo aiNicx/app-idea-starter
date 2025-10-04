@@ -12,6 +12,7 @@ import { useAuth } from './contexts/AuthContext';
 const LANGUAGE_STORAGE_KEY = 'docugenius_language';
 
 type View = 'editor' | 'agentHub' | 'login' | 'register' | 'profile';
+type SidebarView = 'editor' | 'agentHub';
 
 // --- START: DESIGN PREVIEW ---
 // Dati fittizi per l'anteprima del design. Facilmente rimovibile.
@@ -65,7 +66,9 @@ const App: React.FC = () => {
   // --- END: DESIGN PREVIEW ---
 
   const [language, setLanguage] = useState<Language>(() => {
-    return user?.language || (localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language) || 'it';
+    const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language;
+    const userLanguage = user?.language as Language;
+    return userLanguage || storedLanguage || 'it';
   });
   
   const t = translations[language];
@@ -109,15 +112,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleNewProject = () => {
+  const handleNewProject = async () => {
     // --- START: DESIGN PREVIEW ---
     setPreviewProject(null); // Esce dalla modalità anteprima
     // --- END: DESIGN PREVIEW ---
-    const newId = addProject(t.newProject);
-    setActiveProjectId(newId);
-    setCurrentView('editor');
-    if (isMobileSidebarOpen) {
-      setIsMobileSidebarOpen(false);
+    const newId = await addProject(t.newProject);
+    if (newId) {
+      setActiveProjectId(newId);
+      setCurrentView('editor');
+      if (isMobileSidebarOpen) {
+        setIsMobileSidebarOpen(false);
+      }
     }
   };
   
@@ -314,7 +319,7 @@ const App: React.FC = () => {
           projects={projects}
           activeProjectId={activeProjectId}
           language={language}
-          currentView={currentView}
+          currentView={currentView as SidebarView}
           isCollapsed={isSidebarCollapsed}
           isMobileOpen={isMobileSidebarOpen}
           onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
@@ -323,10 +328,7 @@ const App: React.FC = () => {
           onNewProject={handleNewProject}
           onDeleteProject={handleDeleteProject}
           onLanguageChange={setLanguage}
-          onSetView={handleSetView}
-          user={user}
-          onProfileClick={() => setCurrentView('profile')}
-          onLogout={handleLogout}
+          onSetView={(view: SidebarView) => handleSetView(view)}
         />
       )}
       <main className="flex-1 text-light flex flex-col transition-all duration-300">
