@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Document } from '../types';
-import { ideaEnhancerAgent, documentationGeneratorAgent, OPENROUTER_MODELS, OpenRouterModelId } from '../services/openRouterService';
+import { ideaEnhancerAgent, documentationGeneratorAgent, OPENROUTER_MODELS, OpenRouterModelId, getDefaultModel } from '../services/openRouterService';
 import { WandIcon, DocumentTextIcon, SaveIcon, XMarkIcon, CopyIcon, DownloadIcon, CheckIcon } from './icons';
 import Spinner from './Spinner';
 import DocumentCard from './DocumentCard';
@@ -93,7 +93,7 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onUpdateProject,
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDocForModal, setSelectedDocForModal] = useState<Document | null>(null);
-  const [selectedModel, setSelectedModel] = useState<OpenRouterModelId>('x-ai/grok-4-fast:free');
+  const [selectedModel, setSelectedModel] = useState<OpenRouterModelId>(getDefaultModel());
 
   const t = translations[language];
 

@@ -5,22 +5,21 @@ import { ideaEnhancerPrompt, frontendDocPrompt, cssSpecPrompt, backendDocPrompt,
 // Configurazione modelli OpenRouter - puoi aggiungere/rimuovere modelli qui
 export const OPENROUTER_MODELS = {
   // Modelli gratuiti e popolari
-  'meta-llama/llama-3.3-70b-instruct:free': 'Llama 3.3 70B (Free)',
-  'meta-llama/llama-3.1-8b-instruct:free': 'Llama 3.1 8B (Free)',
-  'microsoft/phi-3-mini-128k-instruct:free': 'Phi-3 Mini (Free)',
-  'google/gemini-2.0-flash-exp:free': 'Gemini 2.0 Flash (Free)',
+  'google/gemini-2.0-flash-exp:free': 'gemini-2.0-flash-exp (Free)',
+  'alibaba/tongyi-deepresearch-30b-a3b:free': 'tongyi-deepresearch-30b-a3b (Free)',
 
   // Modelli a pagamento (più potenti)
-  'google/gemini-2.5-flash-lite-preview-09-2025': 'Gemini Flash 2.5 Lite',
-  'deepseek/deepseek-chat-v3.1': 'DeepSeek Chat V3.1',
-  'meta-llama/llama-3.1-405b-instruct': 'Llama 3.1 405B'
+
 } as const;
 
 export type OpenRouterModelId = keyof typeof OPENROUTER_MODELS;
 
 // Configurazione di default
-const DEFAULT_MODEL: OpenRouterModelId = 'meta-llama/llama-3.3-70b-instruct:free';
+export const DEFAULT_MODEL: OpenRouterModelId = 'google/gemini-2.0-flash-exp:free';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
+
+// Helper per ottenere il modello di default
+export const getDefaultModel = (): OpenRouterModelId => DEFAULT_MODEL;
 
 // Tipi per le risposte di OpenRouter
 interface OpenRouterResponse {
