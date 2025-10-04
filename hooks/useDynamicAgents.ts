@@ -522,3 +522,39 @@ export const useMigration = () => {
     rollbackMigration: handleRollback,
   };
 };
+
+// Hook principale per la gestione degli agenti dinamici
+export const useDynamicAgents = (userId: string) => {
+  const agents = useQuery(api.agents.getAllAgentsForUser, { userId: userId as Id<"users"> });
+  const workflows = useQuery(api.workflows.getWorkflowsByUser, { userId: userId as Id<"users"> });
+  const configurations = useQuery(api.agentConfigurations.getConfigurationsByUser, { userId: userId as Id<"users"> });
+
+  const createAgent = useMutation(api.agents.createAgent);
+  const updateAgent = useMutation(api.agents.updateAgent);
+  const deleteAgent = useMutation(api.agents.deleteAgent);
+  const createWorkflow = useMutation(api.workflows.createWorkflow);
+  const updateWorkflow = useMutation(api.workflows.updateWorkflow);
+  const deleteWorkflow = useMutation(api.workflows.deleteWorkflow);
+
+  const executeAgent = useCallback(async (agent: Agent, context: AgentExecutionContext) => {
+    return await DynamicAgentService.executeAgent(agent, context);
+  }, []);
+
+  const executeWorkflow = useCallback(async (workflow: Workflow, context: WorkflowExecutionContext) => {
+    return await DynamicAgentService.executeWorkflow(workflow, context);
+  }, []);
+
+  return {
+    agents: agents || [],
+    workflows: workflows || [],
+    configurations: configurations || [],
+    createAgent,
+    updateAgent,
+    deleteAgent,
+    createWorkflow,
+    updateWorkflow,
+    deleteWorkflow,
+    executeAgent,
+    executeWorkflow
+  };
+};

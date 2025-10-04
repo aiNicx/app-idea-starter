@@ -254,7 +254,7 @@ const App: React.FC = () => {
     // --- END: DESIGN PREVIEW ---
 
     if (currentView === 'agentHub') {
-      return <AgentHub language={language} />;
+      return <AgentHub language={language} userId={user.id} />;
     }
 
     if (projectsLoading) {

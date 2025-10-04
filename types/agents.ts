@@ -3,6 +3,7 @@ import { Id } from "../convex/_generated/dataModel";
 
 export interface Agent {
   id: Id<"agents">;
+  _id?: Id<"agents">; // For Convex compatibility
   userId: Id<"users">;
   name: string;
   description: string;
@@ -21,10 +22,12 @@ export interface WorkflowStep {
   order: number;
   isActive: boolean;
   conditions?: string; // JSON string per logica condizionale
+  parallelExecution?: boolean; // For parallel execution
 }
 
 export interface Workflow {
   id: Id<"workflows">;
+  _id?: Id<"workflows">; // For Convex compatibility
   userId: Id<"users">;
   name: string;
   description: string;
@@ -36,6 +39,7 @@ export interface Workflow {
 
 export interface AgentConfiguration {
   id: Id<"agentConfigurations">;
+  _id?: Id<"agentConfigurations">; // For Convex compatibility
   userId: Id<"users">;
   agentId: Id<"agents">;
   customPrompt?: string;
