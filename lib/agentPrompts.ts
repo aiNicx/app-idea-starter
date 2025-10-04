@@ -1,11 +1,12 @@
 import React from 'react';
-import { 
-    CodeBracketIcon, 
-    PaintBrushIcon, 
-    ServerIcon, 
+import {
+    CodeBracketIcon,
+    PaintBrushIcon,
+    ServerIcon,
     CircleStackIcon,
     WandIcon,
-    BrainCircuitIcon
+    BrainCircuitIcon,
+    SparklesIcon // Added for concept indicator
 } from '../components/icons';
 import { Language, translations } from './translations';
 

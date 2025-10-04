@@ -21,7 +21,7 @@ const AgentHub: React.FC<AgentHubProps> = ({ language }) => {
             {t.agentHubDescription}
           </p>
         </header>
-        
+
         <section id="workflow" className="mb-16">
           <h2 className="text-3xl font-bold text-accent mb-8 text-center">{t.workflowTitle}</h2>
           <WorkflowDiagram language={language} />
@@ -29,7 +29,7 @@ const AgentHub: React.FC<AgentHubProps> = ({ language }) => {
 
         <section id="profiles">
           <h2 className="text-3xl font-bold text-accent mb-8 text-center">{t.agentProfilesTitle}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {agentProfiles.map(agent => (
               <AgentProfileCard key={agent.id} agent={agent} language={language} />
             ))}
