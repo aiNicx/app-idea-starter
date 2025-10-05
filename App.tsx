@@ -11,6 +11,48 @@ import { MenuIcon } from './components/icons';
 import { LoginForm, RegisterForm, UserProfile } from './components/AuthForms';
 import { useAuth } from './contexts/AuthContext';
 
+/**
+ * Determina automaticamente la categoria del documento basata sul contenuto
+ */
+const determineDocumentCategory = (content: string, workflowName?: string): DocumentCategory => {
+  const lowerContent = content.toLowerCase();
+  const lowerWorkflowName = workflowName?.toLowerCase() || '';
+
+  // Logica per determinare categoria basata su parole chiave nel contenuto
+  if (lowerContent.includes('frontend') || lowerContent.includes('ui') || lowerContent.includes('interface') ||
+      lowerContent.includes('component') || lowerContent.includes('react') || lowerContent.includes('html') ||
+      lowerContent.includes('css') || lowerContent.includes('javascript') || lowerContent.includes('typescript')) {
+    return DocumentCategory.FRONTEND;
+  }
+
+  if (lowerContent.includes('backend') || lowerContent.includes('server') || lowerContent.includes('api') ||
+      lowerContent.includes('endpoint') || lowerContent.includes('database') || lowerContent.includes('schema') ||
+      lowerContent.includes('table') || lowerContent.includes('convex') || lowerContent.includes('prisma')) {
+    return DocumentCategory.BACKEND;
+  }
+
+  if (lowerContent.includes('style') || lowerContent.includes('color') || lowerContent.includes('layout') ||
+      lowerContent.includes('responsive') || lowerContent.includes('design') || lowerContent.includes('theme')) {
+    return DocumentCategory.CSS;
+  }
+
+  // Se il workflow ha un nome che indica la categoria, usalo
+  if (lowerWorkflowName.includes('frontend') || lowerWorkflowName.includes('ui')) {
+    return DocumentCategory.FRONTEND;
+  }
+
+  if (lowerWorkflowName.includes('backend') || lowerWorkflowName.includes('api') || lowerWorkflowName.includes('database')) {
+    return DocumentCategory.BACKEND;
+  }
+
+  if (lowerWorkflowName.includes('style') || lowerWorkflowName.includes('css') || lowerWorkflowName.includes('design')) {
+    return DocumentCategory.CSS;
+  }
+
+  // Default: usa la categoria più generale
+  return DocumentCategory.FRONTEND;
+};
+
 const LANGUAGE_STORAGE_KEY = 'docugenius_language';
 
 type View = 'editor' | 'agentHub' | 'login' | 'register' | 'profile';
@@ -219,11 +261,20 @@ const App: React.FC = () => {
           throw new Error('Workflow completed but no content was generated. Please check your workflow configuration, agent prompts, and model settings.');
         }
 
+        // Determina automaticamente la categoria basata sul contenuto e nome del workflow
+        const documentCategory = determineDocumentCategory(finalOutput, workflow.name);
+
         const document = {
           id: `doc_${Date.now()}`,
-          category: DocumentCategory.DB_SCHEMA,
+          category: documentCategory,
           content: finalOutput
         };
+
+        console.log('Document created with category:', {
+          category: documentCategory,
+          contentLength: finalOutput.length,
+          workflowName: workflow.name
+        });
 
         // Salva il documento usando la funzione corretta
         await addDocumentsToProject(currentProject.id, [document]);
