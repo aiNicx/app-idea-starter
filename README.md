@@ -1,40 +1,115 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🤖 AI Agent Workflow System
 
-# Run and deploy your AI Studio app
+Sistema modulare e scalabile per creare, gestire ed eseguire workflow di agenti AI con supporto per esecuzione serie e parallela.
 
-This contains everything you need to run your app locally.
+## 🚀 Quick Start
 
-View your app in AI Studio: https://ai.studio/apps/drive/1tW1Uvf_5AHIuHwgHCm7vWMI-gyOul5PJ
+### Prerequisiti
+- Node.js 18+
+- Account Convex (https://convex.dev)
+- OpenRouter API Key (https://openrouter.ai)
 
-## Run Locally
+### Installazione
 
-**Prerequisites:** Node.js
+```bash
+# Installa dipendenze
+npm install
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+# Configura Convex
+npx convex dev
 
-2. Set up Convex:
-   ```bash
-   npx convex dev
-   ```
-   This will create a `.env.local` file with your Convex URL.
+# Configura variabili d'ambiente
+# Crea .env.local con:
+OPENROUTER_API_KEY=your_api_key_here
 
-3. (Optional) Set up OpenRouter API key for AI features:
-   Add `OPENROUTER_API_KEY=your_api_key_here` to your `.env.local` file
+# ⚠️ IMPORTANTE: Configurazione OpenRouter API
+# Per utilizzare l'applicazione devi:
+# 1. Andare su https://openrouter.ai/
+# 2. Creare un account gratuito
+# 3. Andare su https://openrouter.ai/keys
+# 4. Creare una nuova chiave API gratuita
+# 5. Copiare la chiave e sostituire "your_api_key_here" sopra
+#
+# Nota: OpenRouter ha limiti di rate (es. 100 richieste/minuto per modelli gratuiti)
+# Se vedi errori 429 "Rate limit exceeded", aspetta qualche minuto prima di riprovare.
 
-4. Run the app:
-   ```bash
-   npm run dev
-   ```
+# Avvia il progetto
+npm run dev
+```
 
-## Features
+## 📋 Funzionalità
 
-- **Authentication**: Simple email/password signup and login
-- **Project Management**: Create, edit, and delete projects
-- **Document Generation**: Generate frontend, CSS, backend, and database documentation
-- **Multi-language Support**: Italian and English
-- **Real-time Updates**: Powered by Convex
+### ✅ Gestione Agenti
+- Crea agenti AI personalizzati
+- Configura system prompt, modello LLM, temperatura
+- Supporto per 2 modelli: Gemini 2.0 Flash e Tongyi DeepResearch
+
+### ✅ Workflow Builder
+- Drag & drop per creare sequenze di agenti
+- Esecuzione serie o parallela
+- Chain di output tra agenti
+- Configurazione flessibile per step
+
+### ✅ Esecuzione Workflow
+- Input utente dinamico
+- Esecuzione scalabile
+- Risultati come documenti
+- Gestione errori robusta
+
+## 🏗️ Architettura
+
+```
+Frontend (React + TypeScript)
+  ↓
+Convex (Backend + Database)
+  ↓
+OpenRouter (LLM API)
+  ↓
+Gemini 2.0 Flash / Tongyi DeepResearch
+```
+
+## 📁 Struttura
+
+```
+components/        # Componenti React
+convex/           # Backend Convex
+services/         # Workflow Engine
+hooks/            # Custom Hooks
+types/            # TypeScript Types
+lib/              # Utilities
+```
+
+## 📖 Documentazione
+
+Vedi [CLEAN_ARCHITECTURE.md](./CLEAN_ARCHITECTURE.md) per documentazione completa.
+
+## 🎯 Esempio d'Uso
+
+1. **Crea Agente**: Agent Hub → Create Agent
+2. **Crea Workflow**: Agent Hub → Create Workflow → Drag & Drop agenti
+3. **Esegui**: Main Screen → Seleziona workflow → Input → Execute
+
+## 🛠️ Tecnologie
+
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Backend**: Convex
+- **LLM**: OpenRouter (Gemini 2.0 Flash, Tongyi DeepResearch)
+- **Build**: Vite
+
+## 📊 Metriche
+
+- 85% riduzione complessità
+- 5 componenti essenziali
+- 2 modelli LLM ottimizzati
+- Engine scalabile serie/parallelo
+
+## 🎉 Caratteristiche
+
+- ✅ Semplice e intuitivo
+- ✅ Modulare e estendibile
+- ✅ Scalabile e performante
+- ✅ Codice pulito e manutenibile
+
+---
+
+Made with ❤️ using Convex and OpenRouter

@@ -1,7 +1,3 @@
-import { DocumentCategory, Document } from '../types';
-import { Language } from '../lib/translations';
-import { ideaEnhancerPrompt, frontendDocPrompt, cssSpecPrompt, backendDocPrompt, dbSchemaPrompt } from '../lib/agentPrompts';
-
 // Configurazione modelli OpenRouter - puoi aggiungere/rimuovere modelli qui
 export const OPENROUTER_MODELS = {
   // Modelli gratuiti e popolari
@@ -15,7 +11,7 @@ export const OPENROUTER_MODELS = {
 export type OpenRouterModelId = keyof typeof OPENROUTER_MODELS;
 
 // Configurazione di default
-export const DEFAULT_MODEL: OpenRouterModelId = 'google/gemini-2.0-flash-exp:free';
+export const DEFAULT_MODEL: OpenRouterModelId = 'alibaba/tongyi-deepresearch-30b-a3b:free';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
 
 // Helper per ottenere il modello di default
@@ -35,13 +31,6 @@ interface OpenRouterError {
     message: string;
   };
 }
-
-// Helper per le istruzioni di lingua
-const getLanguageInstruction = (language: Language) => {
-  return language === 'it'
-    ? "IMPORTANT: Your entire response must be in Italian."
-    : "IMPORTANT: Your entire response must be in English.";
-};
 
 // Funzione principale per chiamare OpenRouter con retry logic
 export async function callOpenRouter(prompt: string, modelId: OpenRouterModelId = DEFAULT_MODEL, retries: number = 3): Promise<string> {
@@ -78,13 +67,25 @@ export async function callOpenRouter(prompt: string, modelId: OpenRouterModelId 
         // Se è un errore 429 (rate limit), aspetta e riprova
         if (response.status === 429 && attempt < retries - 1) {
           const waitTime = Math.pow(2, attempt) * 3000; // Exponential backoff: 3s, 6s, 12s
-          console.log(`Rate limit hit, waiting ${waitTime / 1000}s before retry ${attempt + 1}/${retries}...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           continue;
         }
 
-        const errorData: OpenRouterError = await response.json();
-        throw new Error(`OpenRouter API error: ${errorData.error.message}`);
+        // Gestione errori specifici
+        let errorMessage = 'Unknown error occurred';
+        try {
+          const errorData: OpenRouterError = await response.json();
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+
+        // Se è un errore 429 anche all'ultimo tentativo, dai un messaggio più informativo
+        if (response.status === 429) {
+          throw new Error(`Rate limit exceeded. Please wait a few minutes before trying again. OpenRouter allows limited requests per minute. If this persists, check that your API key is configured correctly.`);
+        }
+
+        throw new Error(`OpenRouter API error: ${errorMessage}`);
       }
 
       const data: OpenRouterResponse = await response.json();
@@ -108,133 +109,3 @@ export async function callOpenRouter(prompt: string, modelId: OpenRouterModelId 
   
   throw new Error('Max retries reached');
 }
-
-// --- Agent Functions (adattati per OpenRouter) ---
-
-/**
- * Agent to enhance and mature a given app idea.
- */
-export const ideaEnhancerAgent = async (idea: string, language: Language, modelId?: OpenRouterModelId): Promise<string> => {
-  const prompt = ideaEnhancerPrompt({ idea, langInstruction: getLanguageInstruction(language) });
-
-  try {
-    return await callOpenRouter(prompt, modelId);
-  } catch (error) {
-    console.error("Error in ideaEnhancerAgent:", error);
-    throw new Error("Failed to enhance idea. Please check your API key and connection.");
-  }
-};
-
-/**
- * Orchestrator agent to generate all required documentation for an app idea.
- */
-export const documentationGeneratorAgent = async (idea: string, language: Language, modelId?: OpenRouterModelId): Promise<Document[]> => {
-  const documents: Document[] = [];
-
-  try {
-    console.log("Starting documentation generation...");
-
-    // Helper function to add delay between requests
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-    // 1. Generate Frontend Document first
-    const frontendDoc = await generateFrontendDoc(idea, language, modelId);
-    documents.push(frontendDoc);
-    console.log("Frontend Doc generated.");
-
-    // Wait 2 seconds to avoid rate limiting
-    await delay(2000);
-
-    // 2. Generate CSS Spec
-    try {
-      const cssDoc = await generateCssSpec(idea, language, frontendDoc.content, modelId);
-      documents.push(cssDoc);
-      console.log("CSS Spec generated.");
-    } catch (e) {
-      console.error("CSS Spec generation failed:", e);
-    }
-
-    // Wait 2 seconds to avoid rate limiting
-    await delay(2000);
-
-    // 3. Generate Backend Doc
-    let backendDoc;
-    try {
-      backendDoc = await generateBackendDoc(idea, language, frontendDoc.content, modelId);
-      documents.push(backendDoc);
-      console.log("Backend Doc generated.");
-    } catch (e) {
-      console.error("Backend Doc generation failed:", e);
-    }
-
-    // Wait 2 seconds to avoid rate limiting
-    await delay(2000);
-
-    // 4. Generate DB Schema (only if backend was generated)
-    if (backendDoc) {
-      try {
-        const dbSchemaDoc = await generateDbSchema(idea, language, frontendDoc.content, backendDoc.content, modelId);
-        documents.push(dbSchemaDoc);
-        console.log("DB Schema generated.");
-      } catch (e) {
-        console.error("DB Schema generation failed:", e);
-      }
-    }
-
-    // Reorder documents
-    const categoryOrder = [
-        DocumentCategory.FRONTEND,
-        DocumentCategory.CSS,
-        DocumentCategory.BACKEND,
-        DocumentCategory.DB_SCHEMA,
-    ];
-
-    return documents.sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category));
-
-  } catch (error) {
-      console.error("An error occurred during the documentation generation workflow:", error);
-      return documents;
-  }
-};
-
-// --- Sub-Agents for Specific Documents ---
-
-const generateFrontendDoc = async (idea: string, language: Language, modelId?: OpenRouterModelId): Promise<Document> => {
-  const prompt = frontendDocPrompt({ idea, langInstruction: getLanguageInstruction(language) });
-  const content = await callOpenRouter(prompt, modelId);
-  return { id: `doc_${Date.now()}_fe`, category: DocumentCategory.FRONTEND, content };
-};
-
-const generateCssSpec = async (idea: string, language: Language, frontendDoc: string, modelId?: OpenRouterModelId): Promise<Document> => {
-  const prompt = cssSpecPrompt({ idea, langInstruction: getLanguageInstruction(language), frontendDoc });
-  const content = await callOpenRouter(prompt, modelId);
-  return { id: `doc_${Date.now()}_css`, category: DocumentCategory.CSS, content };
-};
-
-const generateBackendDoc = async (idea: string, language: Language, frontendDoc: string, modelId?: OpenRouterModelId): Promise<Document> => {
-  const prompt = backendDocPrompt({ idea, langInstruction: getLanguageInstruction(language), frontendDoc });
-  const content = await callOpenRouter(prompt, modelId);
-  return { id: `doc_${Date.now()}_be`, category: DocumentCategory.BACKEND, content };
-};
-
-const generateDbSchema = async (idea: string, language: Language, frontendDoc: string, backendDoc: string, modelId?: OpenRouterModelId): Promise<Document> => {
-  const prompt = dbSchemaPrompt({ idea, langInstruction: getLanguageInstruction(language), frontendDoc, backendDoc });
-  let content = await callOpenRouter(prompt, modelId);
-
-  // Pulisce la risposta da eventuali code blocks aggiunti dal modello
-  const codeBlockMatch = content.match(/```typescript\n([\s\S]*?)\n```/);
-  if (codeBlockMatch) {
-      const explanation = content.substring(0, codeBlockMatch.index).trim();
-      const code = codeBlockMatch[1].trim();
-      content = `${explanation}\n\n\`\`\`typescript\n${code}\n\`\`\``;
-  }
-
-  return { id: `doc_${Date.now()}_db`, category: DocumentCategory.DB_SCHEMA, content };
-};
-
-// === FUNZIONI PER AGENTI DINAMICI ===
-// Le funzioni per agenti dinamici sono ora gestite da DynamicAgentService
-// Questo file mantiene solo le funzioni legacy per compatibilità backward
-
-// Le funzioni per workflow dinamici sono ora gestite da DynamicAgentService
-// Questo file mantiene solo le funzioni legacy per compatibilità backward

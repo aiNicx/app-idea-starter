@@ -35,10 +35,11 @@ export default defineSchema({
   agents: defineTable({
     userId: v.id("users"),
     name: v.string(),
-    description: v.string(),
-    persona: v.string(),
-    icon: v.string(), // Nome dell'icona (es. "WandIcon")
-    promptTemplate: v.string(),
+    description: v.string(), // Descrizione dell'agente
+    systemPrompt: v.string(), // System prompt dell'agente
+    modelId: v.string(), // Modello LLM da usare
+    temperature: v.optional(v.number()), // Default 0.7
+    maxTokens: v.optional(v.number()), // Default 2000
     isActive: v.boolean(),
     isSystem: v.boolean(), // true per agenti predefiniti
     order: v.number(),
@@ -54,32 +55,16 @@ export default defineSchema({
     userId: v.id("users"),
     name: v.string(),
     description: v.string(),
-    agentSequence: v.array(v.object({
+    steps: v.array(v.object({
       agentId: v.id("agents"),
       order: v.number(),
-      isActive: v.boolean(),
-      conditions: v.optional(v.string()), // JSON string per logica condizionale
+      executeInParallel: v.boolean(), // true = esegue in parallelo con step successivi dello stesso order
+      useOutputFrom: v.optional(v.number()), // order dello step da cui prendere l'output
     })),
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-  .index("by_user", ["userId"])
-  .index("by_user_active", ["userId", "isActive"]),
-
-  // Tabella configurazioni per agenti
-  agentConfigurations: defineTable({
-    userId: v.id("users"),
-    agentId: v.id("agents"),
-    customPrompt: v.optional(v.string()),
-    modelId: v.string(),
-    temperature: v.number(),
-    maxTokens: v.number(),
-    isActive: v.boolean(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-  .index("by_agent", ["agentId"])
   .index("by_user", ["userId"])
   .index("by_user_active", ["userId", "isActive"]),
 });

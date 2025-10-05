@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
-import ProjectEditor from './components/ProjectEditor';
-import AgentHub from './components/AgentHub';
+import SimpleMainScreen from './components/SimpleMainScreen';
+import SimpleAgentHub from './components/SimpleAgentHub';
 import { useConvexProjectManager } from './hooks/useConvexProjectManager';
-import { Project, DocumentCategory } from './types';
+import { useDynamicAgents } from './hooks/useDynamicAgents';
+import { Project, Document, DocumentCategory } from './types';
+import { Agent } from './types/agents';
 import { Language, translations } from './lib/translations';
 import { MenuIcon } from './components/icons';
 import { LoginForm, RegisterForm, UserProfile } from './components/AuthForms';
@@ -14,56 +16,22 @@ const LANGUAGE_STORAGE_KEY = 'docugenius_language';
 type View = 'editor' | 'agentHub' | 'login' | 'register' | 'profile';
 type SidebarView = 'editor' | 'agentHub';
 
-// --- START: DESIGN PREVIEW ---
-// Dati fittizi per l'anteprima del design. Facilmente rimovibile.
-const createPreviewProject = (language: Language): Project => {
-    const t = translations[language];
-    return {
-        id: 'project_design_preview',
-        name: t.designPreviewProjectName,
-        idea: 'This is a sample project idea to demonstrate the document layout and design. It showcases how different generated documents will be presented to the user.',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        documents: [
-            {
-                id: 'doc_preview_1',
-                category: DocumentCategory.FRONTEND,
-                content: `# Frontend Description: Fictional Social App\n\n## 1. General Overview\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum et quam eget magna finibus vehicula. Integer in magna in elit tincidunt pulvinar.\n\n## 2. Pages & Content\n- **Home/Feed:** Displays a stream of posts from followed users.\n- **Profile:** Shows user details, their posts, and follower counts.\n- **Settings:** Allows users to change their password and notification preferences.\n\n## 3. Core User Flows\n- **User Login:** User enters credentials, is authenticated, and redirected to the Home/Feed.\n- **Creating a Post:** User clicks 'New Post', types a message, and submits it to their feed.`
-            },
-            {
-                id: 'doc_preview_2',
-                category: DocumentCategory.CSS,
-                content: `# CSS Specifics: Style Guide\n\n## 1. Color Palette\n- **Primary:** #1e293b\n- **Secondary:** #334155\n- **Accent:** #38bdf8\n\n## 2. Typography\n- **Headings:** 'Inter', sans-serif (700)\n- **Body:** 'Inter', sans-serif (400)\n\n## 3. UI Elements\n- **Buttons:** Rounded corners, solid accent color for primary actions.\n- **Cards:** Slight shadow, rounded corners, subtle border.`
-            },
-            {
-                id: 'doc_preview_3',
-                category: DocumentCategory.BACKEND,
-                content: `# Backend Architecture\n\n## 1. Core Logic\nPhasellus vitae leo eget sem maximus gravida. Ut in metus vel nulla venenatis vestibulum.\n\n## 2. Key API Endpoints\n- \`GET /api/posts\`: Fetches the main feed.\n- \`POST /api/posts\`: Creates a new post.\n- \`GET /api/users/:id\`: Retrieves a user profile.\n\n## 3. External Services\n- **Authentication:** Clerk or Auth0\n- **Email:** SendGrid`
-            },
-            {
-                id: 'doc_preview_4',
-                category: DocumentCategory.DB_SCHEMA,
-                content: `# DB Schema (Convex)\n\nDonec sed odio dui. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros.\n\n\`\`\`typescript\nimport { defineSchema, defineTable } from "convex/server";\nimport { v } from "convex/values";\n\nexport default defineSchema({\n  users: defineTable({\n    name: v.string(),\n    email: v.string(),\n  }).index("by_email", ["email"]),\n\n  posts: defineTable({\n    authorId: v.id("users"),\n    content: v.string(),\n  }).index("by_author", ["authorId"]),\n});\n\`\`\``
-            },
-        ],
-    };
-};
-// --- END: DESIGN PREVIEW ---
 
 
 const App: React.FC = () => {
   const { user, isLoading: authLoading, login, register, logout, updateUser } = useAuth();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, getProject, addDocumentsToProject } = useConvexProjectManager(user?.id || null);
+  const { agents, workflows, createAgent, createWorkflow, updateAgent, updateWorkflow, executeWorkflow } = useDynamicAgents(user?.id || null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('editor');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
   
-  // --- START: DESIGN PREVIEW ---
-  // Stato per gestire la modalità di anteprima del design.
-  const [previewProject, setPreviewProject] = useState<Project | null>(null);
-  // --- END: DESIGN PREVIEW ---
+  // CRITICAL: Usa un ref per prevenire chiamate multiple
+  const isExecutingRef = useRef(false);
+  
 
   const [language, setLanguage] = useState<Language>(() => {
     const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language;
@@ -84,27 +52,17 @@ const App: React.FC = () => {
     if (authLoading || projectsLoading) {
       return;
     }
-    
-    // --- START: DESIGN PREVIEW ---
-    // Non modificare l'active project se siamo in modalità anteprima
-    if (previewProject) return;
-    // --- END: DESIGN PREVIEW ---
 
     const activeProjectExists = activeProjectId && projects.some(p => p.id === activeProjectId);
 
-    if (!activeProjectExists) {
-      if (projects.length > 0) {
-        setActiveProjectId(projects[0].id);
-      } else if (activeProjectId !== null) {
-        setActiveProjectId(null);
-      }
+    if (!activeProjectExists && projects.length > 0) {
+      setActiveProjectId(projects[0].id);
+    } else if (!activeProjectExists && projects.length === 0 && activeProjectId !== null) {
+      setActiveProjectId(null);
     }
-  }, [projects, activeProjectId, authLoading, projectsLoading, previewProject]);
+  }, [projects, activeProjectId, authLoading, projectsLoading]);
 
   const handleSelectProject = (id: string) => {
-    // --- START: DESIGN PREVIEW ---
-    setPreviewProject(null); // Esce dalla modalità anteprima
-    // --- END: DESIGN PREVIEW ---
     setActiveProjectId(id);
     setCurrentView('editor');
     if (isMobileSidebarOpen) {
@@ -113,9 +71,6 @@ const App: React.FC = () => {
   };
 
   const handleNewProject = async () => {
-    // --- START: DESIGN PREVIEW ---
-    setPreviewProject(null); // Esce dalla modalità anteprima
-    // --- END: DESIGN PREVIEW ---
     const newId = await addProject(t.newProject);
     if (newId) {
       setActiveProjectId(newId);
@@ -127,9 +82,6 @@ const App: React.FC = () => {
   };
   
   const handleSetView = (view: View) => {
-    // --- START: DESIGN PREVIEW ---
-    setPreviewProject(null); // Esce dalla modalità anteprima
-    // --- END: DESIGN PREVIEW ---
     setCurrentView(view);
     if (isMobileSidebarOpen) {
       setIsMobileSidebarOpen(false);
@@ -140,14 +92,6 @@ const App: React.FC = () => {
     deleteProject(projectId);
   }, [deleteProject]);
   
-  // --- START: DESIGN PREVIEW ---
-  // Funzione per attivare la modalità di anteprima.
-  const handleShowPreview = () => {
-    setPreviewProject(createPreviewProject(language));
-    setActiveProjectId(null); // Deseleziona i progetti reali
-    setCurrentView('editor');
-  };
-  // --- END: DESIGN PREVIEW ---
 
   const activeProject = getProject(activeProjectId);
 
@@ -177,6 +121,125 @@ const App: React.FC = () => {
     setActiveProjectId(null);
     setCurrentView('editor');
   };
+
+  // Funzioni per gestire agenti e workflow
+  const handleCreateAgent = async (agentData: Partial<Agent>) => {
+    await createAgent(agentData);
+  };
+
+  const handleCreateWorkflow = async (workflow: any) => {
+    await createWorkflow(workflow);
+  };
+
+  const handleEditAgent = async (agent: Agent) => {
+    await updateAgent(agent._id, {
+      name: agent.name,
+      description: agent.description,
+      systemPrompt: agent.systemPrompt,
+      modelId: agent.modelId,
+      temperature: agent.temperature,
+      maxTokens: agent.maxTokens,
+      isActive: agent.isActive,
+      order: agent.order
+    });
+  };
+
+  const handleEditWorkflow = async (workflow: any) => {
+    await updateWorkflow(workflow._id, {
+      name: workflow.name,
+      description: workflow.description,
+      steps: workflow.steps,
+      isActive: workflow.isActive
+    });
+  };
+
+  const handleExecuteWorkflow = useCallback(async (workflow: any, input: string) => {
+    // CRITICAL: Previeni esecuzioni multiple usando un ref
+    if (isExecutingRef.current) {
+      console.warn('Workflow già in esecuzione, ignoro la richiesta');
+      return;
+    }
+
+    isExecutingRef.current = true;
+    setIsExecuting(true);
+
+    try {
+      const { WorkflowEngine } = await import('./services/workflowEngine');
+
+      // Cattura i valori al momento della chiamata per evitare problemi con dipendenze
+      const currentAgents = agents || [];
+      const currentLanguage = language;
+      const currentProject = activeProject;
+
+      // Controlli di validazione
+      if (!workflow || !workflow.steps || workflow.steps.length === 0) {
+        throw new Error('Workflow has no steps configured');
+      }
+
+      if (currentAgents.length === 0) {
+        throw new Error('No agents available for workflow execution');
+      }
+
+      console.log('Starting workflow execution:', {
+        workflowId: workflow._id,
+        workflowName: workflow.name,
+        stepsCount: workflow.steps.length,
+        agentsCount: currentAgents.length,
+        inputLength: input.length
+      });
+
+      const result = await WorkflowEngine.executeWorkflow(
+        workflow,
+        currentAgents,
+        input,
+        currentLanguage
+      );
+
+      if (result.success && currentProject) {
+        // Converti l'output in documento
+        const finalOutput = WorkflowEngine.getFinalOutput(result);
+
+        console.log('Workflow execution result:', {
+          success: result.success,
+          outputs: result.outputs,
+          finalOutput: finalOutput,
+          finalOutputLength: finalOutput?.length || 0
+        });
+
+        // Controlla se l'output è valido e non vuoto
+        if (!finalOutput || finalOutput.trim().length === 0) {
+          console.warn('Workflow completed but no output generated');
+          console.log('Workflow result details:', {
+            success: result.success,
+            outputs: result.outputs,
+            outputKeys: Object.keys(result.outputs || {}),
+            workflowSteps: workflow.steps.length,
+            agents: currentAgents.map(a => ({ id: a._id, model: a.modelId }))
+          });
+          throw new Error('Workflow completed but no content was generated. Please check your workflow configuration, agent prompts, and model settings.');
+        }
+
+        const document = {
+          id: `doc_${Date.now()}`,
+          category: DocumentCategory.DB_SCHEMA,
+          content: finalOutput
+        };
+
+        // Salva il documento usando la funzione corretta
+        await addDocumentsToProject(currentProject.id, [document]);
+      } else if (!result.success) {
+        // Propaga l'errore per mostrarlo nell'interfaccia
+        throw new Error(result.error || 'Workflow execution failed');
+      }
+    } catch (error) {
+      console.error('Error executing workflow:', error);
+      // Rilancia l'errore per farlo gestire dal componente UI
+      throw error;
+    } finally {
+      isExecutingRef.current = false;
+      setIsExecuting(false);
+    }
+  }, [agents, language, activeProject, updateProject, addDocumentsToProject]);
 
   const renderContent = () => {
     // Se non è autenticato, mostra login/register
@@ -240,21 +303,19 @@ const App: React.FC = () => {
       );
     }
 
-    // --- START: DESIGN PREVIEW ---
-    // Se la modalità anteprima è attiva, renderizza l'editor con il progetto fittizio.
-    if (previewProject) {
-        return (
-            <ProjectEditor 
-                project={previewProject} 
-                onUpdateProject={() => { /* No-op in preview mode */ }}
-                language={language} 
-            />
-        );
-    }
-    // --- END: DESIGN PREVIEW ---
 
     if (currentView === 'agentHub') {
-      return <AgentHub language={language} userId={user.id} />;
+      return (
+        <SimpleAgentHub
+          language={language}
+          agents={agents}
+          workflows={workflows}
+          onCreateAgent={handleCreateAgent}
+          onCreateWorkflow={handleCreateWorkflow}
+          onEditAgent={handleEditAgent}
+          onEditWorkflow={handleEditWorkflow}
+        />
+      );
     }
 
     if (projectsLoading) {
@@ -267,11 +328,14 @@ const App: React.FC = () => {
     
     if (activeProject) {
       return (
-        <ProjectEditor 
-          project={activeProject} 
+        <SimpleMainScreen
+          project={activeProject}
+          workflows={workflows}
           onUpdateProject={updateProject}
           onSaveDocuments={addDocumentsToProject}
-          language={language} 
+          onExecuteWorkflow={handleExecuteWorkflow}
+          language={language}
+          isExecuting={isExecuting}
         />
       );
     }
@@ -289,15 +353,6 @@ const App: React.FC = () => {
             >
                 {t.createFirstProject}
             </button>
-            {/* --- START: DESIGN PREVIEW --- */}
-            {/* Pulsante per attivare la modalità anteprima. */}
-            <button
-                onClick={handleShowPreview}
-                className="bg-secondary text-light font-semibold py-3 px-6 rounded-lg hover:bg-secondary/70 border border-secondary transition-colors text-lg"
-            >
-                {t.designPreview}
-            </button>
-            {/* --- END: DESIGN PREVIEW --- */}
         </div>
       </div>
     );
