@@ -24,10 +24,13 @@ export default defineSchema({
   // Tabella documenti (con relazione project)
   documents: defineTable({
     projectId: v.id("projects"),
+    title: v.optional(v.string()),
     category: v.string(),
     content: v.string(),
     createdAt: v.number(),
-  }).index("by_project", ["projectId"]),
+  })
+  .index("by_project", ["projectId"]) 
+  .index("by_project_title", ["projectId", "title"]),
 
   // === SISTEMA AGENTI MODULARE ===
   

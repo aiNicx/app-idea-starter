@@ -23,6 +23,10 @@ export interface WorkflowStep {
   order: number;
   executeInParallel: boolean;
   useOutputFrom?: number;
+  /** Se true, l'output di questo step deve generare un documento. Default: true (retrocompatibilità) */
+  produceDocument?: boolean;
+  /** Titolo del documento generato da questo step (richiesto se produceDocument !== false) */
+  documentTitle?: string;
 }
 
 export interface Workflow {

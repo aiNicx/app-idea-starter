@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Project, Document } from '../types';
 import { Workflow } from '../types/agents';
 import { Language, translations } from '../lib/translations';
@@ -12,6 +12,7 @@ interface SimpleMainScreenProps {
   onUpdateProject: (project: Project) => void;
   onExecuteWorkflow: (workflow: Workflow, input: string) => Promise<void>;
   onSaveDocuments?: (projectId: string, documents: Document[]) => Promise<void>;
+  onDeleteDocument?: (documentId: string) => Promise<void> | void;
   isExecuting?: boolean;
 }
 
@@ -22,11 +23,27 @@ const SimpleMainScreen: React.FC<SimpleMainScreenProps> = ({
   onUpdateProject,
   onExecuteWorkflow,
   onSaveDocuments,
+  onDeleteDocument,
   isExecuting = false
 }) => {
   const t = translations[language];
   const [currentProject, setCurrentProject] = useState<Project>(project);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+
+  // Sincronizza quando cambia il progetto selezionato (evita mostrare documenti del progetto precedente)
+  useEffect(() => {
+    setCurrentProject(project);
+  }, [project]);
+
+  // Render guard: se per qualche motivo il progetto non è definito, non renderizzare
+  if (!currentProject) {
+    return (
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-900">
+        <div className="max-w-6xl mx-auto text-gray-300">Nessun progetto selezionato.</div>
+      </div>
+    );
+  }
 
   const handleProjectUpdate = (updates: Partial<Project>) => {
     const updatedProject = { ...currentProject, ...updates };
@@ -110,10 +127,7 @@ const SimpleMainScreen: React.FC<SimpleMainScreenProps> = ({
                 <DocumentCard
                   key={doc.id}
                   document={doc}
-                  onView={() => {
-                    // TODO: Implement document view functionality
-                    console.log('View document:', doc.id);
-                  }}
+                  onView={() => setViewingDoc(doc)}
                 />
               ))}
             </div>
@@ -152,6 +166,41 @@ const SimpleMainScreen: React.FC<SimpleMainScreenProps> = ({
             <p className="text-gray-400">
               {t.processingDescription || 'Your workflow is running. This may take a few moments.'}
             </p>
+          </div>
+        )}
+
+        {/* Modal Visualizza Documento */}
+        {viewingDoc && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-gray-900 w-full max-w-3xl rounded-lg border border-gray-700 shadow-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-white">{viewingDoc.title || viewingDoc.category}</h3>
+                <div className="flex items-center gap-2">
+                  {onDeleteDocument && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await onDeleteDocument(viewingDoc.id);
+                          setViewingDoc(null);
+                        } catch (e) {
+                          console.error('Failed to delete document', e);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 border border-red-500"
+                    >
+                      Elimina
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setViewingDoc(null)}
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-700"
+                  >
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+              <div className="whitespace-pre-wrap text-gray-200 text-sm max-h-[60vh] overflow-auto">{viewingDoc.content}</div>
+            </div>
           </div>
         )}
       </div>

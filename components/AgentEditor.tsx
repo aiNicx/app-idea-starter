@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Agent } from '../types/agents';
 import { Language, translations } from '../lib/translations';
-import { OPENROUTER_MODELS } from '../services/openRouterService';
+import { OPENROUTER_MODELS, getDefaultModel } from '../services/openRouterService';
 
 interface AgentEditorProps {
   agent?: Agent;
@@ -27,7 +27,7 @@ const AgentEditor: React.FC<AgentEditorProps> = ({
     name: agent?.name || '',
     description: agent?.description || '',
     systemPrompt: agent?.systemPrompt || '',
-    modelId: agent?.modelId || 'google/gemini-2.0-flash-exp:free',
+    modelId: agent?.modelId || getDefaultModel(),
     temperature: agent?.temperature || 0.7,
     maxTokens: agent?.maxTokens || 2000
   });
@@ -41,9 +41,23 @@ const AgentEditor: React.FC<AgentEditorProps> = ({
     <div className="flex-1 bg-gray-900 p-6 overflow-y-auto">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">
-            {agent ? t.editAgent || 'Edit Agent' : t.createAgent || 'Create Agent'}
-          </h2>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700 hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title={'Torna indietro'}
+              aria-label={'Torna indietro'}
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm">{'Indietro'}</span>
+            </button>
+            <h2 className="text-2xl font-bold text-white">
+              {agent ? t.editAgent || 'Edit Agent' : t.createAgent || 'Create Agent'}
+            </h2>
+          </div>
           <p className="text-gray-400">
             {t.agentEditorDescription || 'Configure your AI agent with a name, system prompt, and model settings.'}
           </p>

@@ -19,6 +19,7 @@ export const useConvexProjectManager = (userId: string | null) => {
   const updateProjectMutation = useMutation(api.projects.updateProject);
   const deleteProjectMutation = useMutation(api.projects.deleteProject);
   const createDocumentMutation = useMutation(api.projects.createDocument);
+  const deleteDocumentMutation = useMutation(api.projects.deleteDocument);
 
   useEffect(() => {
     if (projectsData) {
@@ -29,6 +30,7 @@ export const useConvexProjectManager = (userId: string | null) => {
         idea: project.idea,
         documents: project.documents.map(doc => ({
           id: doc.id,
+          title: (doc as any).title,
           category: doc.category as DocumentCategory,
           content: doc.content
         })),
@@ -109,6 +111,7 @@ export const useConvexProjectManager = (userId: string | null) => {
         await createDocumentMutation({
           projectId: projectId as Id<"projects">,
           userId: userId as Id<"users">,
+          title: (doc as any).title,
           category: doc.category,
           content: doc.content,
         });
@@ -118,6 +121,20 @@ export const useConvexProjectManager = (userId: string | null) => {
     }
   }, [userId, createDocumentMutation]);
 
+  const deleteDocument = useCallback(async (
+    documentId: string
+  ) => {
+    if (!userId) return;
+    try {
+      await deleteDocumentMutation({
+        documentId: documentId as Id<"documents">,
+        userId: userId as Id<"users">,
+      });
+    } catch (error) {
+      console.error("Failed to delete document:", error);
+    }
+  }, [userId, deleteDocumentMutation]);
+
   return { 
     projects, 
     loading, 
@@ -125,6 +142,7 @@ export const useConvexProjectManager = (userId: string | null) => {
     updateProject, 
     deleteProject, 
     getProject,
-    addDocumentsToProject
+    addDocumentsToProject,
+    deleteDocument
   };
 };

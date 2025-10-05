@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Agent, Workflow, WorkflowStep } from '../types/agents';
 import { Language, translations } from '../lib/translations';
+import { DocumentCategory } from '../types';
 
 interface WorkflowBuilderProps {
   workflow?: Workflow;
@@ -26,7 +27,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
       agentId: agent._id,
       order: steps.length,
       executeInParallel: false,
-      useOutputFrom: steps.length > 0 ? steps.length - 1 : undefined
+      useOutputFrom: steps.length > 0 ? steps.length - 1 : undefined,
+      // default: crea documento con titolo precompilato col nome agente
+      produceDocument: undefined,
+      documentTitle: agent.name
     };
 
     setSteps([...steps, newStep]);
@@ -56,8 +60,32 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
     setSteps(newSteps);
   };
 
+  const setProduceDocument = (index: number, produce: boolean) => {
+    const newSteps = [...steps];
+    newSteps[index] = {
+      ...newSteps[index],
+      // default è true; se produce=false lo salviamo esplicitamente
+      produceDocument: produce ? undefined : false
+    };
+    setSteps(newSteps);
+  };
+
+  const setDocumentTitle = (index: number, title: string) => {
+    const newSteps = [...steps];
+    (newSteps[index] as any).documentTitle = title;
+    setSteps(newSteps);
+  };
+
+  // rimosso category hint
+
   const handleSave = () => {
     if (!name.trim() || steps.length === 0) return;
+    // Valida: se uno step crea documento, il titolo è obbligatorio
+    const invalid = steps.some((s) => (s.produceDocument !== false) && !(s as any).documentTitle);
+    if (invalid) {
+      // semplice guard: non salviamo se manca un titolo richiesto
+      return;
+    }
     onSave({ name, description, steps, isActive: true });
   };
 
@@ -98,7 +126,19 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
       {/* Center Panel - Workflow Builder */}
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
+          <div className="mb-6 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700 hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title={'Torna indietro'}
+              aria-label={'Torna indietro'}
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm">{'Indietro'}</span>
+            </button>
             <input
               type="text"
               placeholder={t.workflowName || 'Workflow Name'}
@@ -186,6 +226,43 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
                             </select>
                           </div>
                         )}
+                      </div>
+
+                      {/* Document Production Controls */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={step.produceDocument !== false}
+                              onChange={(e) => setProduceDocument(index, e.target.checked)}
+                              className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-gray-300">{'Crea documento'}</span>
+                          </label>
+                          <span
+                            className="ml-2 text-gray-400 hover:text-gray-300"
+                            title="Se disattivato, l'output resta interno al workflow e non verrà salvato come documento."
+                          >
+                            i
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <input
+                            type="text"
+                            placeholder={'Titolo documento (richiesto se crea documento)'}
+                            value={(step as any).documentTitle || ''}
+                            onChange={(e) => setDocumentTitle(index, e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm disabled:opacity-50"
+                            disabled={step.produceDocument === false}
+                          />
+                          <span
+                            className="ml-2 text-gray-400 hover:text-gray-300"
+                            title="Titolo che verrà salvato sul documento generato da questo step."
+                          >
+                            i
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );

@@ -76,14 +76,18 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, onView }) => {
             </button>
           </div>
         </div>
-        <h3 className="text-xl font-bold text-light mb-2">{document.category}</h3>
+        <h3 className="text-xl font-bold text-light mb-2">{document.title || document.category}</h3>
         <p className="text-sm text-dark-text leading-relaxed h-20 overflow-hidden">
           {contentPreview}
         </p>
       </div>
-      <div className="text-right text-accent font-semibold mt-4 text-sm uppercase tracking-wider group-hover:underline">
+      <button
+        onClick={(e) => { e.stopPropagation(); onView(); }}
+        className="text-right text-accent font-semibold mt-4 text-sm uppercase tracking-wider group-hover:underline"
+        title="View document"
+      >
         View Document
-      </div>
+      </button>
     </div>
   );
 };

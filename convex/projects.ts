@@ -67,6 +67,7 @@ export const listProjects = query({
           idea: project.idea,
           documents: documents.map(doc => ({
             id: doc._id,
+            title: (doc as any).title,
             category: doc.category,
             content: doc.content,
           })),
@@ -107,6 +108,7 @@ export const getProject = query({
       idea: project.idea,
       documents: documents.map(doc => ({
         id: doc._id,
+        title: (doc as any).title,
         category: doc.category,
         content: doc.content,
       })),
@@ -183,11 +185,12 @@ export const createDocument = mutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
+    title: v.optional(v.string()),
     category: v.string(),
     content: v.string(),
   },
   handler: async (ctx, args) => {
-    const { projectId, userId, category, content } = args;
+    const { projectId, userId, title, category, content } = args;
     
     // Verifica proprietario progetto
     const project = await ctx.db.get(projectId);
@@ -196,8 +199,21 @@ export const createDocument = mutation({
     }
     
     const now = Date.now();
+
+    // Evita duplicati: se esiste già un documento con stesso titolo e contenuto per il progetto
+    if (title) {
+      const existing = await ctx.db
+        .query("documents")
+        .withIndex("by_project_title", (q) => q.eq("projectId", projectId).eq("title", title))
+        .first();
+      if (existing && existing.content === content) {
+        return existing._id;
+      }
+    }
+
     const documentId = await ctx.db.insert("documents", {
       projectId,
+      title,
       category,
       content,
       createdAt: now,

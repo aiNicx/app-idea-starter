@@ -62,7 +62,7 @@ type SidebarView = 'editor' | 'agentHub';
 
 const App: React.FC = () => {
   const { user, isLoading: authLoading, login, register, logout, updateUser } = useAuth();
-  const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, getProject, addDocumentsToProject } = useConvexProjectManager(user?.id || null);
+  const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, getProject, addDocumentsToProject, deleteDocument } = useConvexProjectManager(user?.id || null);
   const { agents, workflows, createAgent, createWorkflow, updateAgent, updateWorkflow, executeWorkflow } = useDynamicAgents(user?.id || null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('editor');
@@ -238,46 +238,46 @@ const App: React.FC = () => {
       );
 
       if (result.success && currentProject) {
-        // Converti l'output in documento
-        const finalOutput = WorkflowEngine.getFinalOutput(result);
+        // Salva SOLO gli output degli step con produceDocument=true (default true per retrocompatibilità)
+        const documents = (workflow.steps || [])
+          .filter((s: any) => s?.produceDocument !== false)
+          .map((s: any) => {
+            const order = s.order as number;
+            const output = result.outputs?.[order];
+            const content = (output || '').trim();
+            if (!content) return null;
 
-        console.log('Workflow execution result:', {
+            const category = determineDocumentCategory(content, `${workflow.name} step ${order}`);
+
+            // Titolo: se non fornito, usa il nome dell'agente come default
+            const rawTitle = (s as any).documentTitle;
+            const stepAgent = currentAgents.find(a => a._id === s.agentId);
+            const fallbackTitle = stepAgent?.name ? stepAgent.name : `${workflow.name} - Step ${order + 1}`;
+            const title = rawTitle && String(rawTitle).trim().length > 0 ? String(rawTitle).trim() : fallbackTitle;
+
+            return {
+              id: `doc_${Date.now()}_${order}`,
+              title,
+              category,
+              content
+            };
+          })
+          .filter((d): d is { id: string; title: string; category: DocumentCategory; content: string } => d !== null);
+
+        console.log('Workflow execution result (multi-output):', {
           success: result.success,
-          outputs: result.outputs,
-          finalOutput: finalOutput,
-          finalOutputLength: finalOutput?.length || 0
+          outputsCount: Object.keys(result.outputs || {}).length,
+          documentsToSave: documents.length
         });
 
-        // Controlla se l'output è valido e non vuoto
-        if (!finalOutput || finalOutput.trim().length === 0) {
-          console.warn('Workflow completed but no output generated');
-          console.log('Workflow result details:', {
-            success: result.success,
-            outputs: result.outputs,
-            outputKeys: Object.keys(result.outputs || {}),
-            workflowSteps: workflow.steps.length,
-            agents: currentAgents.map(a => ({ id: a._id, model: a.modelId }))
-          });
-          throw new Error('Workflow completed but no content was generated. Please check your workflow configuration, agent prompts, and model settings.');
+        if (documents.length === 0) {
+          console.warn('Workflow completed but no non-empty outputs to save');
+          // Non bloccare l'utente con errore
+          return;
         }
 
-        // Determina automaticamente la categoria basata sul contenuto e nome del workflow
-        const documentCategory = determineDocumentCategory(finalOutput, workflow.name);
-
-        const document = {
-          id: `doc_${Date.now()}`,
-          category: documentCategory,
-          content: finalOutput
-        };
-
-        console.log('Document created with category:', {
-          category: documentCategory,
-          contentLength: finalOutput.length,
-          workflowName: workflow.name
-        });
-
-        // Salva il documento usando la funzione corretta
-        await addDocumentsToProject(currentProject.id, [document]);
+        // Salva tutti i documenti prodotti dagli step (lato server evita duplicati per titolo/contenuto)
+        await addDocumentsToProject(currentProject.id, documents as any);
       } else if (!result.success) {
         // Propaga l'errore per mostrarlo nell'interfaccia
         throw new Error(result.error || 'Workflow execution failed');
@@ -384,6 +384,7 @@ const App: React.FC = () => {
           workflows={workflows}
           onUpdateProject={updateProject}
           onSaveDocuments={addDocumentsToProject}
+          onDeleteDocument={deleteDocument}
           onExecuteWorkflow={handleExecuteWorkflow}
           language={language}
           isExecuting={isExecuting}

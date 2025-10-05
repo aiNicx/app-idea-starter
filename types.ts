@@ -8,6 +8,7 @@ export enum DocumentCategory {
 
 export interface Document {
   id: string;
+  title?: string;
   category: DocumentCategory;
   content: string;
 }
